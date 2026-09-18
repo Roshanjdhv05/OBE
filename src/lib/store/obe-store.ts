@@ -408,6 +408,16 @@ export class OBEStore {
     return mapProg(data);
   }
 
+  static async updateProgramme(id: string, name: string, code: string): Promise<void> {
+    await db().from('programmes').update({ programme_name: name, programme_code: code }).eq('id', id);
+    await OBEStore.addAuditLog(`Updated Programme: ${code} - ${name}`, 'Programme');
+  }
+
+  static async deleteProgramme(id: string): Promise<void> {
+    await db().from('programmes').delete().eq('id', id);
+    await OBEStore.addAuditLog(`Deleted Programme ID ${id}`, 'Programme');
+  }
+
   // ── SEMESTERS ───────────────────────────────────────────────────────────────
 
   static async getSemesters(programmeId?: string): Promise<Semester[]> {
@@ -428,6 +438,16 @@ export class OBEStore {
     return mapSem(data);
   }
 
+  static async updateSemester(id: string, name: string, num: number): Promise<void> {
+    await db().from('semesters').update({ semester_name: name, semester_number: num }).eq('id', id);
+    await OBEStore.addAuditLog(`Updated Semester: ${name}`, 'Semester');
+  }
+
+  static async deleteSemester(id: string): Promise<void> {
+    await db().from('semesters').delete().eq('id', id);
+    await OBEStore.addAuditLog(`Deleted Semester ID ${id}`, 'Semester');
+  }
+
   // ── SUBJECTS ────────────────────────────────────────────────────────────────
 
   static async getSubjects(semesterId?: string): Promise<Subject[]> {
@@ -446,6 +466,16 @@ export class OBEStore {
     if (error) throw error;
     await OBEStore.addAuditLog(`Added Subject: ${code} - ${name}`, 'Subject');
     return mapSub(data);
+  }
+
+  static async updateSubject(id: string, name: string, code: string): Promise<void> {
+    await db().from('subjects').update({ subject_name: name, subject_code: code }).eq('id', id);
+    await OBEStore.addAuditLog(`Updated Subject: ${code} - ${name}`, 'Subject');
+  }
+
+  static async deleteSubject(id: string): Promise<void> {
+    await db().from('subjects').delete().eq('id', id);
+    await OBEStore.addAuditLog(`Deleted Subject ID ${id}`, 'Subject');
   }
 
   // ── COURSE OUTCOMES ─────────────────────────────────────────────────────────
@@ -470,12 +500,14 @@ export class OBEStore {
     return mapCO(data);
   }
 
-  static async updateCourseOutcome(id: string, description: string): Promise<void> {
-    await db().from('course_outcomes').update({ description }).eq('id', id);
+  static async updateCourseOutcome(id: string, coCode: string, description: string): Promise<void> {
+    await db().from('course_outcomes').update({ co_code: coCode, description }).eq('id', id);
+    await OBEStore.addAuditLog(`Updated CO ${coCode}`, 'Course Outcome');
   }
 
   static async deleteCourseOutcome(id: string): Promise<void> {
     await db().from('course_outcomes').delete().eq('id', id);
+    await OBEStore.addAuditLog(`Deleted Course Outcome ID ${id}`, 'Course Outcome');
   }
 
   // ── USERS ────────────────────────────────────────────────────────────────────
@@ -811,7 +843,7 @@ export class OBEStore {
   }
 
   static async getStudents(semesterId?: string): Promise<Student[]> {
-    let q = db().from('students').select('*').order('student_id');
+    let q = db().from('students').select('*');
     if (semesterId) q = q.eq('semester_id', semesterId);
     const { data, error } = await q;
     if (error) console.error('getStudents error:', error);
@@ -822,8 +854,7 @@ export class OBEStore {
     const { data, error } = await db()
       .from('students')
       .select('*')
-      .eq('programme_id', programmeId)
-      .order('student_id');
+      .eq('programme_id', programmeId);
     if (error) console.error('getStudentsByProgramme error:', error);
     return (data || []).map(mapStudent);
   }
@@ -831,8 +862,7 @@ export class OBEStore {
   static async getAllStudents(): Promise<Student[]> {
     const { data, error } = await db()
       .from('students')
-      .select('*')
-      .order('student_id');
+      .select('*');
     if (error) console.error('getAllStudents error:', error);
     return (data || []).map(mapStudent);
   }

@@ -33,6 +33,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { BloomTaxonomyPieChart, CORecordForBloom } from '@/components/charts/BloomTaxonomyPieChart';
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'student' | 'cumulative' | 'programme'>('student');
@@ -63,6 +64,7 @@ export default function ReportsPage() {
 
   // Report Async Cache Maps
   const [studentUuidMap, setStudentUuidMap] = useState<Record<string, string>>({});
+  const [studentNameMap, setStudentNameMap] = useState<Record<string, string>>({});
   const [configsMap, setConfigsMap] = useState<Record<string, any>>({});
   const [cosMap, setCosMap] = useState<Record<string, CourseOutcome[]>>({});
   const [ciaLatestMap, setCiaLatestMap] = useState<Record<string, any>>({});
@@ -74,10 +76,50 @@ export default function ReportsPage() {
 
   const isStudentMatch = (resultStudentId: string, targetStudent: Student) => {
     if (!resultStudentId || !targetStudent) return false;
+
+    // 1. Direct UUID or studentId match
     if (resultStudentId === targetStudent.id) return true;
     if (resultStudentId === targetStudent.studentId) return true;
+
+    const targetNameNorm = (targetStudent.studentName || '').toLowerCase().trim();
+    const targetIdClean = (targetStudent.studentId || '').toLowerCase().replace(/[\s-]/g, '');
+
     const mappedCode = studentUuidMap[resultStudentId];
-    if (mappedCode && mappedCode.toLowerCase().trim() === targetStudent.studentId.toLowerCase().trim()) return true;
+    const mappedName = studentNameMap[resultStudentId];
+
+    // 2. Match by Student Name (normalized) — Matches student across all semesters regardless of semester code prefix
+    if (targetNameNorm && targetNameNorm.length > 1) {
+      if (mappedName && mappedName.toLowerCase().trim() === targetNameNorm) return true;
+
+      const resultObj = allSystemStudents.find((s) => s.id === resultStudentId);
+      if (resultObj && (resultObj.studentName || '').toLowerCase().trim() === targetNameNorm) {
+        return true;
+      }
+    }
+
+    // 3. Match by exact normalized student code
+    const resultClean = (resultStudentId || '').toLowerCase().replace(/[\s-]/g, '');
+    if (targetIdClean && resultClean && resultClean === targetIdClean) return true;
+
+    if (mappedCode) {
+      const mappedClean = mappedCode.toLowerCase().replace(/[\s-]/g, '');
+      if (mappedClean === targetIdClean) return true;
+
+      // 4. Match by Roll Suffix (e.g. FYBCOM101-26-001 and TYBCOM501-26-001 both end in '26-001' or '001')
+      const targetParts = targetStudent.studentId.split('-');
+      const mappedParts = mappedCode.split('-');
+      if (targetParts.length > 1 && mappedParts.length > 1) {
+        const targetSuffix = targetParts.slice(1).join('-').toLowerCase().trim();
+        const mappedSuffix = mappedParts.slice(1).join('-').toLowerCase().trim();
+        if (targetSuffix && mappedSuffix && targetSuffix === mappedSuffix) return true;
+      }
+
+      // Check last 4 chars (e.g. '001')
+      const targetEnd = targetIdClean.slice(-4);
+      const mappedEnd = mappedClean.slice(-4);
+      if (targetEnd && targetEnd.length >= 3 && targetEnd === mappedEnd) return true;
+    }
+
     return false;
   };
 
@@ -85,10 +127,13 @@ export default function ReportsPage() {
     const allStds = await OBEStore.getAllStudents();
     console.log('[Reports] getAllStudents returned:', allStds.length, 'students');
     const uuidMap: Record<string, string> = {};
+    const nameMap: Record<string, string> = {};
     allStds.forEach((s) => {
       uuidMap[s.id] = s.studentId;
+      nameMap[s.id] = s.studentName;
     });
     setStudentUuidMap((prev) => ({ ...prev, ...uuidMap }));
+    setStudentNameMap((prev) => ({ ...prev, ...nameMap }));
     setAllSystemStudents(allStds);
 
     if (semId) {
@@ -231,15 +276,24 @@ export default function ReportsPage() {
 
   // Filtered students list based on search text
   const filteredStudents = useMemo(() => {
-    let list = availableStudents;
     if (studentSearch.trim()) {
-      const q = studentSearch.toLowerCase().trim();
-      list = list.filter(
-        (s) => s.studentId.toLowerCase().includes(q) || s.studentName.toLowerCase().includes(q)
-      );
+      const qRaw = studentSearch.toLowerCase().trim();
+      const qClean = qRaw.replace(/[\s-]/g, '');
+      const filtered = allSystemStudents.filter((s) => {
+        const idRaw = (s.studentId || '').toLowerCase();
+        const idClean = idRaw.replace(/[\s-]/g, '');
+        const nameRaw = (s.studentName || '').toLowerCase();
+        return (
+          idRaw.includes(qRaw) ||
+          idClean.includes(qClean) ||
+          nameRaw.includes(qRaw)
+        );
+      });
+      return filtered.length > 0 ? filtered : availableStudents;
     }
-    return list;
-  }, [availableStudents, studentSearch]);
+    return availableStudents.length > 0 ? availableStudents : allSystemStudents;
+  }, [availableStudents, allSystemStudents, studentSearch]);
+
 
   const activeProg = programmes.find((p) => p.id === selectedProgId);
   const activeSem = semesters.find((s) => s.id === selectedSemId);
@@ -597,8 +651,10 @@ export default function ReportsPage() {
 
       console.log('[Reports] progAllStudents final list:', list.length);
       setProgAllStudents(list);
-      if (list.length > 0 && !cumulativeStudent) {
-        setCumulativeStudent(list[0]);
+      if (list.length > 0) {
+        if (!cumulativeStudent || !list.some((s) => s.id === cumulativeStudent.id)) {
+          setCumulativeStudent(list[0]);
+        }
       }
     };
     fetchProgStudents();
@@ -607,36 +663,39 @@ export default function ReportsPage() {
 
   // Filter cumulative students by search query across system-wide students
   const filteredCumulativeStudents = useMemo(() => {
+    const pool = progAllStudents.length > 0 ? progAllStudents : allSystemStudents;
     if (cumulativeSearch.trim()) {
       const qRaw = cumulativeSearch.toLowerCase().trim();
       const qClean = qRaw.replace(/[\s-]/g, '');
-      return allSystemStudents.filter((s) => {
-        const idRaw = s.studentId.toLowerCase();
+      const searched = allSystemStudents.filter((s) => {
+        const idRaw = (s.studentId || '').toLowerCase();
         const idClean = idRaw.replace(/[\s-]/g, '');
-        const nameRaw = s.studentName.toLowerCase();
+        const nameRaw = (s.studentName || '').toLowerCase();
         return idRaw.includes(qRaw) || idClean.includes(qClean) || nameRaw.includes(qRaw);
       });
+      return searched.length > 0 ? searched : pool;
     }
-    return progAllStudents;
+    return pool;
   }, [progAllStudents, allSystemStudents, cumulativeSearch]);
 
   // Load complete Sem 1 to Sem 6 dataset for selected student
   const fetchCumulativeReportForStudent = async (student: Student, progId: string) => {
     setLoadingCumulative(true);
     try {
-      const allStds = await OBEStore.getStudents();
+      const allStds = await OBEStore.getAllStudents();
       const uuidMap: Record<string, string> = {};
+      const nameMap: Record<string, string> = {};
       allStds.forEach((s) => {
         uuidMap[s.id] = s.studentId;
+        nameMap[s.id] = s.studentName;
       });
       setStudentUuidMap((prev) => ({ ...prev, ...uuidMap }));
+      setStudentNameMap((prev) => ({ ...prev, ...nameMap }));
 
-      let targetProgId = progId;
-      if (student.programmeId && student.programmeId !== progId) {
-        targetProgId = student.programmeId;
+      let sems = await OBEStore.getSemesters(selectedProgId);
+      if (sems.length === 0 && student.programmeId) {
+        sems = await OBEStore.getSemesters(student.programmeId);
       }
-
-      let sems = await OBEStore.getSemesters(targetProgId);
       if (sems.length === 0 && progId) {
         sems = await OBEStore.getSemesters(progId);
       }
@@ -857,6 +916,25 @@ export default function ReportsPage() {
       missingSemestersCount,
       enrolledSemestersCount,
     };
+  }, [cumulativeSemestersData]);
+
+  const cumulativeCORecords = useMemo(() => {
+    const list: CORecordForBloom[] = [];
+    cumulativeSemestersData.forEach((semData) => {
+      semData.subRecords?.forEach((subRec: any) => {
+        subRec.coList?.forEach((co: any) => {
+          list.push({
+            coCode: co.coCode,
+            coDesc: co.coDesc,
+            finalPct: co.finalPct,
+            ciaPct: co.ciaPct,
+            esePct: co.esePct,
+            directPct: co.directPct,
+          });
+        });
+      });
+    });
+    return list;
   }, [cumulativeSemestersData]);
 
   const loadHtml2Pdf = (): Promise<any> => {
@@ -1104,9 +1182,13 @@ export default function ReportsPage() {
   };
 
   const selectedStudentObj = useMemo(() => {
-    if (selectedStudentId === 'all') return null;
-    return availableStudents.find((s) => s.id === selectedStudentId) || allSystemStudents.find((s) => s.id === selectedStudentId) || null;
-  }, [availableStudents, allSystemStudents, selectedStudentId]);
+    if (!selectedStudentId || selectedStudentId === 'all') return null;
+    return (
+      allSystemStudents.find((s) => s.id === selectedStudentId) ||
+      availableStudents.find((s) => s.id === selectedStudentId) ||
+      null
+    );
+  }, [selectedStudentId, availableStudents, allSystemStudents]);
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -1300,9 +1382,30 @@ export default function ReportsPage() {
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                     <input
                       type="text"
-                      placeholder="Type Student ID or Student Name to quickly search..."
+                      placeholder="Type Student User ID (e.g. FYBCOM201-26-001) or Name to search..."
                       value={studentSearch}
-                      onChange={(e) => setStudentSearch(e.target.value)}
+                      onChange={(e) => {
+                        const query = e.target.value;
+                        setStudentSearch(query);
+                        if (query.trim()) {
+                          const qRaw = query.toLowerCase().trim();
+                          const qClean = qRaw.replace(/[\s-]/g, '');
+                          const found = allSystemStudents.find((s) => {
+                            const idRaw = (s.studentId || '').toLowerCase();
+                            const idClean = idRaw.replace(/[\s-]/g, '');
+                            const nameRaw = (s.studentName || '').toLowerCase();
+                            return idRaw === qRaw || idClean === qClean || idRaw.includes(qRaw) || idClean.includes(qClean) || nameRaw.includes(qRaw);
+                          }) || availableStudents.find((s) => {
+                            const idRaw = (s.studentId || '').toLowerCase();
+                            const idClean = idRaw.replace(/[\s-]/g, '');
+                            const nameRaw = (s.studentName || '').toLowerCase();
+                            return idRaw === qRaw || idClean === qClean || idRaw.includes(qRaw) || idClean.includes(qClean) || nameRaw.includes(qRaw);
+                          });
+                          if (found) {
+                            setSelectedStudentId(found.id);
+                          }
+                        }
+                      }}
                       className="w-full bg-slate-50 border border-slate-300 pl-9 pr-4 py-2 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                   </div>
@@ -1369,7 +1472,14 @@ export default function ReportsPage() {
                       }
 
                       return (
-                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                        <div className="space-y-6">
+                          <BloomTaxonomyPieChart
+                            title="Student Bloom's Taxonomy Attainment Distribution (K1 to K6)"
+                            subtitle={`Evaluated COs across subjects for ${selectedStudentObj.studentName} (${selectedStudentObj.studentId})`}
+                            coRecords={records}
+                          />
+
+                          <div className="overflow-x-auto border border-slate-200 rounded-xl">
                           <table className="w-full text-left text-xs">
                             <thead className="bg-slate-900 text-white font-semibold">
                               <tr>
@@ -1432,6 +1542,7 @@ export default function ReportsPage() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       );
                     })()}
@@ -1537,7 +1648,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Programme */}
                   <div>
                     <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
@@ -1560,11 +1671,11 @@ export default function ReportsPage() {
                   <div>
                     <label className="block text-[11px] font-bold uppercase text-amber-800 mb-1 flex items-center gap-1">
                       <Search className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Search Student ID / Name</span>
+                      <span>Search Student User ID / Name</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="Type Student User ID (e.g. FYBCOM201-26-001)..."
+                      placeholder="Type Student User ID (e.g. FYBCOM201-26-001) or Name..."
                       value={cumulativeSearch}
                       onChange={(e) => {
                         const query = e.target.value;
@@ -1573,9 +1684,14 @@ export default function ReportsPage() {
                           const qRaw = query.toLowerCase().trim();
                           const qClean = qRaw.replace(/[\s-]/g, '');
                           const found = allSystemStudents.find((s) => {
-                            const idRaw = s.studentId.toLowerCase();
+                            const idRaw = (s.studentId || '').toLowerCase();
                             const idClean = idRaw.replace(/[\s-]/g, '');
-                            const nameRaw = s.studentName.toLowerCase();
+                            const nameRaw = (s.studentName || '').toLowerCase();
+                            return idRaw === qRaw || idClean === qClean || idRaw.includes(qRaw) || idClean.includes(qClean) || nameRaw.includes(qRaw);
+                          }) || progAllStudents.find((s) => {
+                            const idRaw = (s.studentId || '').toLowerCase();
+                            const idClean = idRaw.replace(/[\s-]/g, '');
+                            const nameRaw = (s.studentName || '').toLowerCase();
                             return idRaw === qRaw || idClean === qClean || idRaw.includes(qRaw) || idClean.includes(qClean) || nameRaw.includes(qRaw);
                           });
                           if (found) {
@@ -1583,37 +1699,24 @@ export default function ReportsPage() {
                             if (found.programmeId && programmes.some((p) => p.id === found.programmeId)) {
                               setSelectedProgId(found.programmeId);
                             }
+                          } else {
+                            const virtualStudent: Student = {
+                              id: query.trim(),
+                              academicYearId: activeYear?.id || '',
+                              programmeId: selectedProgId,
+                              semesterId: '',
+                              studentId: query.trim(),
+                              studentName: query.trim(),
+                            };
+                            setCumulativeStudent(virtualStudent);
                           }
+                        } else {
+                          const defaultStudent = progAllStudents[0] || allSystemStudents[0] || null;
+                          setCumulativeStudent(defaultStudent);
                         }
                       }}
                       className="w-full bg-amber-50/50 border border-amber-300 rounded-xl text-xs font-bold text-amber-950 px-3 py-2.5 focus:ring-2 focus:ring-amber-500 font-mono placeholder:font-sans placeholder:text-slate-400 shadow-xs"
                     />
-                  </div>
-
-                  {/* Student Selector Dropdown */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-blue-700 mb-1">
-                      Select Student Account ({filteredCumulativeStudents.length} Available)
-                    </label>
-                    <select
-                      value={cumulativeStudent?.id || ''}
-                      onChange={(e) => {
-                        const s = allSystemStudents.find((st) => st.id === e.target.value) || progAllStudents.find((st) => st.id === e.target.value);
-                        if (s) {
-                          setCumulativeStudent(s);
-                          if (s.programmeId && programmes.some((p) => p.id === s.programmeId)) {
-                            setSelectedProgId(s.programmeId);
-                          }
-                        }
-                      }}
-                      className="w-full bg-blue-50/70 border border-blue-300 rounded-xl text-xs font-bold text-blue-900 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 font-mono"
-                    >
-                      {filteredCumulativeStudents.map((std) => (
-                        <option key={std.id} value={std.id}>
-                          {std.studentId} — {std.studentName} {std.batchYear ? `(Batch ${std.batchYear})` : ''}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </div>
@@ -1704,6 +1807,13 @@ export default function ReportsPage() {
                       <div className="text-[11px] font-medium text-purple-700 mt-0.5">{cumulativeStats.attainedCOs} / {cumulativeStats.totalCOs} COs Attained</div>
                     </div>
                   </div>
+
+                  {/* Bloom's Taxonomy Pie Chart for Cumulative 6-Semester Profile */}
+                  <BloomTaxonomyPieChart
+                    title="Cumulative 6-Semester Bloom's Taxonomy Level Distribution (K1 to K6)"
+                    subtitle={`Aggregated CO Attainment across Semesters 1 to 6 for ${cumulativeStudent.studentName} (${cumulativeStudent.studentId})`}
+                    coRecords={cumulativeCORecords}
+                  />
 
                   {/* Semester-by-Semester Tables (Sem 1 to Sem 6) */}
                   <div className="space-y-6 pt-2">
