@@ -14,8 +14,8 @@
 export function calculateDirectAttainment(
   ciaAttainment: number,
   eseAttainment: number,
-  ciaWeight: number = 0.50,
-  eseWeight: number = 0.50
+  ciaWeight: number = 0.40,
+  eseWeight: number = 0.60
 ): number {
   return (ciaAttainment * ciaWeight) + (eseAttainment * eseWeight);
 }

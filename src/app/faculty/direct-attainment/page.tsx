@@ -14,7 +14,7 @@ export default function DirectAttainmentPage() {
   const [subjectId, setSubjectId] = useState('');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [directData, setDirectData] = useState<any[]>([]);
-  const [weights, setWeights] = useState({ ciaWeight: 0.50, eseWeight: 0.50, directWeight: 0.80 });
+  const [weights, setWeights] = useState({ ciaWeight: 0.40, eseWeight: 0.60, directWeight: 0.80 });
 
   const [currentConfig, setCurrentConfig] = useState<any>({ studentTargetPercentage: 50 });
 
@@ -49,8 +49,8 @@ export default function DirectAttainmentPage() {
       const eseAssessments = await OBEStore.getAssessments(subjectId, 'ESE');
       const config = await OBEStore.getCalculationConfig(subjectId);
       setCurrentConfig(config);
-      const ciaW = config.ciaWeight ?? 0.50;
-      const eseW = config.eseWeight ?? 0.50;
+      const ciaW = config.ciaWeight ?? 0.40;
+      const eseW = config.eseWeight ?? 0.60;
       const directW = config.directWeight ?? 0.80;
 
       setWeights({ ciaWeight: ciaW, eseWeight: eseW, directWeight: directW });
@@ -88,7 +88,7 @@ export default function DirectAttainmentPage() {
           eseAttainment = calculateCIACOAttainment(attained, eseResults.length);
         }
 
-        const average5050 = Number(((ciaAttainment + eseAttainment) / 2).toFixed(2));
+        const average4060 = Number(((ciaAttainment * ciaW) + (eseAttainment * eseW)).toFixed(2));
         const ciaContrib = Number((ciaAttainment * ciaW).toFixed(2));
         const eseContrib = Number((eseAttainment * eseW).toFixed(2));
         const finalWeighted = Number((ciaContrib + eseContrib).toFixed(2));
@@ -98,7 +98,7 @@ export default function DirectAttainmentPage() {
           coCode: co.coCode,
           ciaAttainment,
           eseAttainment,
-          average5050,
+          average5050: average4060,
           ciaContrib,
           eseContrib,
           finalWeighted,
@@ -171,7 +171,7 @@ export default function DirectAttainmentPage() {
                         <th className="p-4">CO</th>
                         <th className="p-4 text-center">CIA Attainment %</th>
                         <th className="p-4 text-center">ESE Attainment %</th>
-                        <th className="p-4 text-center">Average (50/50)</th>
+                        <th className="p-4 text-center">Average (40/60)</th>
                         <th className="p-4 text-center">CIA × {(weights.ciaWeight * 100).toFixed(0)}%</th>
                         <th className="p-4 text-center">ESE × {(weights.eseWeight * 100).toFixed(0)}%</th>
                         <th className="p-4 text-center">Final Weighted Attainment %</th>

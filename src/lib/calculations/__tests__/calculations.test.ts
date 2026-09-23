@@ -33,18 +33,18 @@ export function runCalculationUnitTests() {
   // 2. Direct Attainment Tests
   const ciaVal = 95.1;
   const eseVal = 65.0;
-  const direct = calculateDirectAttainment(ciaVal, eseVal, 0.50, 0.50); // (95.1 + 65.0) / 2 = 80.05%
+  const direct = calculateDirectAttainment(ciaVal, eseVal, 0.40, 0.60); // (95.1 * 0.4) + (65.0 * 0.6) = 77.04%
   results.push({
-    test: 'Direct Attainment 50% CIA + 50% ESE ((95.1 + 65.0)/2 = 80.05%)',
-    passed: direct === 80.05,
-    details: `Expected 80.05, got ${direct}`,
+    test: 'Direct Attainment 40% CIA + 60% ESE (77.04%)',
+    passed: direct === 77.04,
+    details: `Expected 77.04, got ${direct}`,
   });
 
-  const weightedDirect = calculateWeightedDirect(direct, 0.8); // 80.05 * 0.8 = 64.04%
+  const weightedDirect = calculateWeightedDirect(direct, 0.8); // 77.04 * 0.8 = 61.632%
   results.push({
-    test: 'Weighted Direct (80.05 * 0.8 = 64.04%)',
-    passed: Number(weightedDirect.toFixed(2)) === 64.04,
-    details: `Expected 64.04, got ${weightedDirect}`,
+    test: 'Weighted Direct (77.04 * 0.8 = 61.63%)',
+    passed: Number(weightedDirect.toFixed(2)) === 61.63,
+    details: `Expected 61.63, got ${weightedDirect}`,
   });
 
   // 3. Exit Survey Tests
@@ -80,11 +80,11 @@ export function runCalculationUnitTests() {
   });
 
   // 4. Final Attainment Tests
-  const finalAttainment = calculateFinalAttainment(weightedDirect, weightedIndirect); // 64.04 + 10 = 74.04%
+  const finalAttainment = calculateFinalAttainment(weightedDirect, weightedIndirect); // 61.632 + 10 = 71.63%
   results.push({
-    test: 'Final Attainment (64.04 + 10 = 74.04%)',
-    passed: finalAttainment === 74.04,
-    details: `Expected 74.04, got ${finalAttainment}`,
+    test: 'Final Attainment (61.63 + 10 = 71.63%)',
+    passed: finalAttainment === 71.63,
+    details: `Expected 71.63, got ${finalAttainment}`,
   });
 
   const score = calculateCOAttainmentScore(finalAttainment); // 75.63 / 100 = 0.7563

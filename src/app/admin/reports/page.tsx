@@ -307,8 +307,8 @@ export default function ReportsPage() {
       level3Threshold: 80,
       directWeight: 0.8,
       indirectWeight: 0.2,
-      ciaWeight: 0.5,
-      eseWeight: 0.5,
+      ciaWeight: 0.4,
+      eseWeight: 0.6,
       surveyMaxScore: 5.0,
       coTargetLevels: {},
     };
@@ -471,7 +471,7 @@ export default function ReportsPage() {
         const esePct = stdEse ? stdEse.percentage : undefined;
         const directPct =
           ciaPct !== undefined && esePct !== undefined
-            ? ciaPct * config.ciaWeight + esePct * config.eseWeight
+            ? ciaPct * (config.ciaWeight ?? 0.4) + esePct * (config.eseWeight ?? 0.6)
             : ciaPct !== undefined
             ? ciaPct
             : esePct !== undefined
@@ -736,7 +736,7 @@ export default function ReportsPage() {
             const esePct = stdEse ? stdEse.percentage : undefined;
             const directPct =
               ciaPct !== undefined && esePct !== undefined
-                ? ciaPct * (cfg.ciaWeight ?? 0.5) + esePct * (cfg.eseWeight ?? 0.5)
+                ? ciaPct * (cfg.ciaWeight ?? 0.4) + esePct * (cfg.eseWeight ?? 0.6)
                 : ciaPct !== undefined
                 ? ciaPct
                 : esePct !== undefined

@@ -69,7 +69,7 @@ Visit: http://localhost:3000
 | `/faculty/co-attainment` | CO Attainment Analysis (CIA-based) |
 | `/faculty/cia` | CIA Excel Upload & Calculation |
 | `/faculty/ese` | ESE Excel Upload & Calculation |
-| `/faculty/direct-attainment` | Direct Attainment (CIA + ESE / 2) |
+| `/faculty/direct-attainment` | Direct Attainment (CIA 40% + ESE 60%) |
 | `/faculty/course-exit-survey` | Course Exit Survey Upload |
 | `/faculty/indirect-attainment` | Indirect Attainment Table |
 | `/faculty/final-attainment` | Final CO Attainment with Interpretation |
@@ -82,7 +82,7 @@ Visit: http://localhost:3000
 |---------|-------------|
 | `CO% = (Obtained / Max) × 100` | Student CO Percentage |
 | `CIA CO Attainment = (Attained Students / Total) × 100` | CO-level CIA Attainment |
-| `Direct = (CIA + ESE) / 2` | Direct Attainment |
+| `Direct = (CIA × 0.40) + (ESE × 0.60)` | Direct Attainment |
 | `Weighted Direct = Direct × 0.80` | Weighted Direct (configurable) |
 | `Indirect% = (Weighted Avg / 5) × 100` | Exit Survey Indirect % |
 | `Weighted Indirect = Indirect × 0.20` | Weighted Indirect (configurable) |

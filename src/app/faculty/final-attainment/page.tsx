@@ -19,7 +19,7 @@ export default function FinalAttainmentPage() {
   const [subjectId, setSubjectId] = useState('');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [finalData, setFinalData] = useState<any[]>([]);
-  const [weights, setWeights] = useState({ ciaWeight: 0.50, eseWeight: 0.50, directWeight: 0.80, indirectWeight: 0.20 });
+  const [weights, setWeights] = useState({ ciaWeight: 0.40, eseWeight: 0.60, directWeight: 0.80, indirectWeight: 0.20 });
   const [recalculating, setRecalculating] = useState(false);
   const [subjectInfo, setSubjectInfo] = useState<any>(null);
 
@@ -53,8 +53,8 @@ export default function FinalAttainmentPage() {
     const eseAssessments = await OBEStore.getAssessments(subId, 'ESE');
     const surveyAssessments = await OBEStore.getAssessments(subId, 'COURSE_EXIT_SURVEY');
     const config = await OBEStore.getCalculationConfig(subId);
-    const ciaW = config.ciaWeight ?? 0.50;
-    const eseW = config.eseWeight ?? 0.50;
+    const ciaW = config.ciaWeight ?? 0.40;
+    const eseW = config.eseWeight ?? 0.60;
     const directW = config.directWeight ?? 0.80;
     const indirectW = config.indirectWeight ?? 0.20;
 

@@ -58,8 +58,8 @@ function SubjectDetailContent() {
     level1Threshold: 50,
     level2Threshold: 60,
     level3Threshold: 70,
-    ciaWeight: 0.5,
-    eseWeight: 0.5,
+    ciaWeight: 0.4,
+    eseWeight: 0.6,
     directWeight: 0.8,
     indirectWeight: 0.2,
     surveyMaxScore: 5,
@@ -317,10 +317,10 @@ function SubjectDetailContent() {
     });
 
     // Direct Breakdown
-    const directPct = calculateDirectAttainment(ciaPct, esePct, config.ciaWeight ?? 0.5, config.eseWeight ?? 0.5);
-    const average5050 = Number(((ciaPct + esePct) / 2).toFixed(2));
-    const ciaContrib = Number((ciaPct * (config.ciaWeight ?? 0.5)).toFixed(2));
-    const eseContrib = Number((esePct * (config.eseWeight ?? 0.5)).toFixed(2));
+    const directPct = calculateDirectAttainment(ciaPct, esePct, config.ciaWeight ?? 0.4, config.eseWeight ?? 0.6);
+    const average5050 = Number(((ciaPct * (config.ciaWeight ?? 0.4)) + (esePct * (config.eseWeight ?? 0.6))).toFixed(2));
+    const ciaContrib = Number((ciaPct * (config.ciaWeight ?? 0.4)).toFixed(2));
+    const eseContrib = Number((esePct * (config.eseWeight ?? 0.6)).toFixed(2));
     const directLevel = evaluateAttainmentLevel(directPct, {
       level1: config.level1Threshold,
       level2: config.level2Threshold,
@@ -1084,7 +1084,7 @@ function SubjectDetailContent() {
                       <th className="p-3.5">CO</th>
                       <th className="p-3.5 text-center">CIA Attainment %</th>
                       <th className="p-3.5 text-center">ESE Attainment %</th>
-                      <th className="p-3.5 text-center">Average (50/50)</th>
+                      <th className="p-3.5 text-center">Average (40/60)</th>
                       <th className="p-3.5 text-center">CIA × {(config.ciaWeight * 100).toFixed(0)}%</th>
                       <th className="p-3.5 text-center">ESE × {(config.eseWeight * 100).toFixed(0)}%</th>
                       <th className="p-3.5 text-center">Final Weighted Attainment %</th>
