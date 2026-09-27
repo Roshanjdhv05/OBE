@@ -134,6 +134,55 @@ export interface PSO {
   programmeId: string;
   psoCode: string;
   description: string;
+  status?: 'active' | 'inactive';
+  displayOrder?: number;
+}
+
+export interface GraduateAttribute {
+  id: string;
+  code: string;
+  description: string;
+  status: 'active' | 'inactive';
+  displayOrder?: number;
+}
+
+export interface ProgrammeOutcome {
+  id: string;
+  academicYearId?: string;
+  programmeId: string;
+  poCode: string;
+  title?: string;
+  description: string;
+  status: 'active' | 'inactive';
+  displayOrder?: number;
+}
+
+export interface GAPOMapping {
+  id: string;
+  programmeId: string;
+  gaId: string;
+  poId: string;
+  mappingLevel: number;
+}
+
+export interface COPOMapping {
+  id: string;
+  programmeId: string;
+  semesterId: string;
+  subjectId: string;
+  coId: string;
+  poId: string;
+  mappingLevel: number;
+}
+
+export interface COPSOMapping {
+  id: string;
+  programmeId: string;
+  semesterId: string;
+  subjectId: string;
+  coId: string;
+  psoId: string;
+  mappingLevel: number;
 }
 
 export interface AuditLog {
@@ -144,6 +193,7 @@ export interface AuditLog {
   recordDetails?: string;
   createdAt: string;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -981,21 +1031,512 @@ export class OBEStore {
   // ── PSOs ─────────────────────────────────────────────────────────────────────
 
   static async getPSOs(programmeId?: string): Promise<PSO[]> {
-    let q = db().from('psos').select('*').order('pso_code');
-    if (programmeId) q = q.eq('programme_id', programmeId);
-    const { data } = await q;
-    return (data || []).map(mapPSO);
+    let localList: PSO[] = [];
+    if (typeof window !== 'undefined' && programmeId) {
+      const stored = localStorage.getItem('obe_psos_' + programmeId);
+      if (stored) {
+        try { localList = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      let q = db().from('psos').select('*').order('pso_code');
+      if (programmeId) q = q.eq('programme_id', programmeId);
+      const { data, error } = await q;
+      if (!error && data) {
+        const mapped = data.map(mapPSO);
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {}
+
+    return localList;
   }
 
   static async addPSO(academicYearId: string, programmeId: string, psoCode: string, description: string): Promise<PSO> {
-    const { data, error } = await db()
-      .from('psos')
-      .insert({ academic_year_id: academicYearId, programme_id: programmeId, pso_code: psoCode, description })
-      .select()
-      .single();
-    if (error) throw error;
+    let newPso: PSO = {
+      id: 'pso-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      academicYearId,
+      programmeId,
+      psoCode,
+      description,
+      status: 'active',
+    };
+
+    try {
+      const { data, error } = await db()
+        .from('psos')
+        .insert({ academic_year_id: academicYearId, programme_id: programmeId, pso_code: psoCode, description })
+        .select()
+        .single();
+      if (!error && data) newPso = mapPSO(data);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getPSOs(programmeId);
+      const updated = [...current.filter(p => p.id !== newPso.id), newPso];
+      localStorage.setItem('obe_psos_' + programmeId, JSON.stringify(updated));
+    }
+
     await OBEStore.addAuditLog(`Created PSO: ${psoCode}`, 'PSO Management');
-    return mapPSO(data);
+    return newPso;
+  }
+
+  static async updatePSO(id: string, programmeId: string, psoCode: string, description: string): Promise<void> {
+    try {
+      await db().from('psos').update({ pso_code: psoCode, description }).eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getPSOs(programmeId);
+      const updated = current.map(p => p.id === id ? { ...p, psoCode, description } : p);
+      localStorage.setItem('obe_psos_' + programmeId, JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Updated PSO: ${psoCode}`, 'PSO Management');
+  }
+
+  static async deletePSO(id: string, programmeId?: string): Promise<void> {
+    try {
+      await db().from('psos').delete().eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined' && programmeId) {
+      const current = await OBEStore.getPSOs(programmeId);
+      const updated = current.filter(p => p.id !== id);
+      localStorage.setItem('obe_psos_' + programmeId, JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Deleted PSO ID: ${id}`, 'PSO Management');
+  }
+
+  // ── GRADUATE ATTRIBUTES (GA) ────────────────────────────────────────────────
+
+  static async getGraduateAttributes(): Promise<GraduateAttribute[]> {
+    let localList: GraduateAttribute[] = [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('obe_gas');
+      if (stored) {
+        try { localList = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      const { data, error } = await db().from('graduate_attributes').select('*').order('code');
+      if (!error && data && data.length > 0) {
+        return data.map((r: any) => ({
+          id: r.id,
+          code: r.code,
+          description: r.description,
+          status: r.status || 'active',
+          displayOrder: r.display_order || 1,
+        }));
+      }
+    } catch {}
+
+    return localList;
+  }
+
+  static async addGraduateAttribute(code: string, description: string): Promise<GraduateAttribute> {
+    let newGa: GraduateAttribute = {
+      id: 'ga-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      code,
+      description,
+      status: 'active',
+    };
+
+    try {
+      const { data, error } = await db()
+        .from('graduate_attributes')
+        .insert({ code, description, status: 'active' })
+        .select()
+        .single();
+      if (!error && data) {
+        newGa = {
+          id: data.id,
+          code: data.code,
+          description: data.description,
+          status: data.status,
+          displayOrder: data.display_order,
+        };
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getGraduateAttributes();
+      const updated = [...current.filter(g => g.id !== newGa.id), newGa];
+      localStorage.setItem('obe_gas', JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Created GA: ${code}`, 'OBE Mapping');
+    return newGa;
+  }
+
+  static async updateGraduateAttribute(id: string, code: string, description: string): Promise<void> {
+    try {
+      await db().from('graduate_attributes').update({ code, description }).eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getGraduateAttributes();
+      const updated = current.map(g => g.id === id ? { ...g, code, description } : g);
+      localStorage.setItem('obe_gas', JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Updated GA: ${code}`, 'OBE Mapping');
+  }
+
+  static async deleteGraduateAttribute(id: string): Promise<void> {
+    try {
+      await db().from('graduate_attributes').delete().eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getGraduateAttributes();
+      const updated = current.filter(g => g.id !== id);
+      localStorage.setItem('obe_gas', JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Deleted GA ID: ${id}`, 'OBE Mapping');
+  }
+
+  // ── PROGRAMME OUTCOMES (PO) ────────────────────────────────────────────────
+
+  static async getProgrammeOutcomes(programmeId?: string): Promise<ProgrammeOutcome[]> {
+    let localList: ProgrammeOutcome[] = [];
+    if (typeof window !== 'undefined' && programmeId) {
+      const stored = localStorage.getItem('obe_pos_' + programmeId);
+      if (stored) {
+        try { localList = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      let q = db().from('programme_outcomes').select('*').order('po_code');
+      if (programmeId) q = q.eq('programme_id', programmeId);
+      const { data, error } = await q;
+      if (!error && data && data.length > 0) {
+        return data.map((r: any) => ({
+          id: r.id,
+          academicYearId: r.academic_year_id,
+          programmeId: r.programme_id,
+          poCode: r.po_code,
+          title: r.title || r.po_code,
+          description: r.description,
+          status: r.status || 'active',
+          displayOrder: r.display_order || 1,
+        }));
+      }
+    } catch {}
+
+    return localList;
+  }
+
+  static async addProgrammeOutcome(
+    academicYearId: string,
+    programmeId: string,
+    poCode: string,
+    title: string,
+    description: string
+  ): Promise<ProgrammeOutcome> {
+    let newPo: ProgrammeOutcome = {
+      id: 'po-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      academicYearId,
+      programmeId,
+      poCode,
+      title: title || poCode,
+      description,
+      status: 'active',
+    };
+
+    try {
+      const { data, error } = await db()
+        .from('programme_outcomes')
+        .insert({
+          academic_year_id: academicYearId,
+          programme_id: programmeId,
+          po_code: poCode,
+          title: title || poCode,
+          description,
+          status: 'active',
+        })
+        .select()
+        .single();
+      if (!error && data) {
+        newPo = {
+          id: data.id,
+          academicYearId: data.academic_year_id,
+          programmeId: data.programme_id,
+          poCode: data.po_code,
+          title: data.title,
+          description: data.description,
+          status: data.status,
+          displayOrder: data.display_order,
+        };
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getProgrammeOutcomes(programmeId);
+      const updated = [...current.filter(p => p.id !== newPo.id), newPo];
+      localStorage.setItem('obe_pos_' + programmeId, JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Created PO: ${poCode} for Programme ID ${programmeId}`, 'OBE Mapping');
+    return newPo;
+  }
+
+  static async updateProgrammeOutcome(
+    id: string,
+    programmeId: string,
+    poCode: string,
+    title: string,
+    description: string
+  ): Promise<void> {
+    try {
+      await db()
+        .from('programme_outcomes')
+        .update({ po_code: poCode, title, description })
+        .eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      const current = await OBEStore.getProgrammeOutcomes(programmeId);
+      const updated = current.map(p => p.id === id ? { ...p, poCode, title, description } : p);
+      localStorage.setItem('obe_pos_' + programmeId, JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Updated PO: ${poCode}`, 'OBE Mapping');
+  }
+
+  static async deleteProgrammeOutcome(id: string, programmeId?: string): Promise<void> {
+    try {
+      await db().from('programme_outcomes').delete().eq('id', id);
+    } catch {}
+
+    if (typeof window !== 'undefined' && programmeId) {
+      const current = await OBEStore.getProgrammeOutcomes(programmeId);
+      const updated = current.filter(p => p.id !== id);
+      localStorage.setItem('obe_pos_' + programmeId, JSON.stringify(updated));
+    }
+
+    await OBEStore.addAuditLog(`Deleted PO ID: ${id}`, 'OBE Mapping');
+  }
+
+  // ── GA → PO MAPPINGS ────────────────────────────────────────────────────────
+
+  static async getGAPOMappings(programmeId: string): Promise<GAPOMapping[]> {
+    let localMap: GAPOMapping[] = [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('obe_ga_po_map_' + programmeId);
+      if (stored) {
+        try { localMap = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      const { data, error } = await db()
+        .from('ga_po_mappings')
+        .select('*')
+        .eq('programme_id', programmeId);
+      if (!error && data) {
+        const mapped = data.map((r: any) => ({
+          id: r.id,
+          programmeId: r.programme_id,
+          gaId: r.ga_id,
+          poId: r.po_id,
+          mappingLevel: Number(r.mapping_level),
+        }));
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {}
+
+    return localMap;
+  }
+
+  static async saveGAPOMappings(
+    programmeId: string,
+    mappings: { gaId: string; poId: string; mappingLevel: number }[]
+  ): Promise<void> {
+    const formatted: GAPOMapping[] = mappings.map(m => ({
+      id: `${programmeId}_${m.gaId}_${m.poId}`,
+      programmeId,
+      gaId: m.gaId,
+      poId: m.poId,
+      mappingLevel: m.mappingLevel,
+    }));
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('obe_ga_po_map_' + programmeId, JSON.stringify(formatted));
+    }
+
+    try {
+      const supabase = db();
+      for (const m of mappings) {
+        await supabase.from('ga_po_mappings').upsert(
+          {
+            programme_id: programmeId,
+            ga_id: m.gaId,
+            po_id: m.poId,
+            mapping_level: m.mappingLevel,
+          },
+          { onConflict: 'programme_id,ga_id,po_id' }
+        );
+      }
+    } catch (err) {
+      console.warn('Could not save ga_po_mappings to Supabase:', err);
+    }
+
+    await OBEStore.addAuditLog(`Saved GA-PO Mappings for Programme ID ${programmeId}`, 'OBE Mapping');
+  }
+
+  // ── CO → PO MAPPINGS ────────────────────────────────────────────────────────
+
+  static async getCOPOMappings(subjectId: string): Promise<COPOMapping[]> {
+    let localMap: COPOMapping[] = [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('obe_co_po_map_' + subjectId);
+      if (stored) {
+        try { localMap = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      const { data, error } = await db()
+        .from('co_po_mappings')
+        .select('*')
+        .eq('subject_id', subjectId);
+      if (!error && data) {
+        const mapped = data.map((r: any) => ({
+          id: r.id,
+          programmeId: r.programme_id,
+          semesterId: r.semester_id,
+          subjectId: r.subject_id,
+          coId: r.co_id,
+          poId: r.po_id,
+          mappingLevel: Number(r.mapping_level),
+        }));
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {}
+
+    return localMap;
+  }
+
+  static async saveCOPOMappings(
+    subjectId: string,
+    programmeId: string,
+    semesterId: string,
+    mappings: { coId: string; poId: string; mappingLevel: number }[]
+  ): Promise<void> {
+    const formatted: COPOMapping[] = mappings.map(m => ({
+      id: `${subjectId}_${m.coId}_${m.poId}`,
+      programmeId,
+      semesterId,
+      subjectId,
+      coId: m.coId,
+      poId: m.poId,
+      mappingLevel: m.mappingLevel,
+    }));
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('obe_co_po_map_' + subjectId, JSON.stringify(formatted));
+    }
+
+    try {
+      const supabase = db();
+      for (const m of mappings) {
+        await supabase.from('co_po_mappings').upsert(
+          {
+            programme_id: programmeId,
+            semester_id: semesterId,
+            subject_id: subjectId,
+            co_id: m.coId,
+            po_id: m.poId,
+            mapping_level: m.mappingLevel,
+          },
+          { onConflict: 'co_id,po_id' }
+        );
+      }
+    } catch (err) {
+      console.warn('Could not save co_po_mappings to Supabase:', err);
+    }
+
+    await OBEStore.addAuditLog(`Saved CO-PO Mappings for Subject ID ${subjectId}`, 'OBE Mapping');
+  }
+
+  // ── CO → PSO MAPPINGS ───────────────────────────────────────────────────────
+
+  static async getCOPSOMappings(subjectId: string): Promise<COPSOMapping[]> {
+    let localMap: COPSOMapping[] = [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('obe_co_pso_map_' + subjectId);
+      if (stored) {
+        try { localMap = JSON.parse(stored); } catch {}
+      }
+    }
+
+    try {
+      const { data, error } = await db()
+        .from('co_pso_mappings')
+        .select('*')
+        .eq('subject_id', subjectId);
+      if (!error && data) {
+        const mapped = data.map((r: any) => ({
+          id: r.id,
+          programmeId: r.programme_id,
+          semesterId: r.semester_id,
+          subjectId: r.subject_id,
+          coId: r.co_id,
+          psoId: r.pso_id,
+          mappingLevel: Number(r.mapping_level),
+        }));
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {}
+
+    return localMap;
+  }
+
+  static async saveCOPSOMappings(
+    subjectId: string,
+    programmeId: string,
+    semesterId: string,
+    mappings: { coId: string; psoId: string; mappingLevel: number }[]
+  ): Promise<void> {
+    const formatted: COPSOMapping[] = mappings.map(m => ({
+      id: `${subjectId}_${m.coId}_${m.psoId}`,
+      programmeId,
+      semesterId,
+      subjectId,
+      coId: m.coId,
+      psoId: m.psoId,
+      mappingLevel: m.mappingLevel,
+    }));
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('obe_co_pso_map_' + subjectId, JSON.stringify(formatted));
+    }
+
+    try {
+      const supabase = db();
+      for (const m of mappings) {
+        await supabase.from('co_pso_mappings').upsert(
+          {
+            programme_id: programmeId,
+            semester_id: semesterId,
+            subject_id: subjectId,
+            co_id: m.coId,
+            pso_id: m.psoId,
+            mapping_level: m.mappingLevel,
+          },
+          { onConflict: 'co_id,pso_id' }
+        );
+      }
+    } catch (err) {
+      console.warn('Could not save co_pso_mappings to Supabase:', err);
+    }
+
+    await OBEStore.addAuditLog(`Saved CO-PSO Mappings for Subject ID ${subjectId}`, 'OBE Mapping');
   }
 
   // ── AUDIT LOGS ───────────────────────────────────────────────────────────────
@@ -1020,3 +1561,4 @@ export class OBEStore {
       });
   }
 }
+

@@ -135,7 +135,7 @@ export default function IndirectAttainmentPage() {
               <div className="p-4 border-b border-slate-200 bg-slate-50">
                 <h3 className="text-sm font-bold text-slate-900">Indirect Attainment — Course Exit Survey Analysis</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Formula: Weighted Avg = (Grade1×1 + Grade2×2 + Grade3×3 + Grade4×4 + Grade5×5) / Total &nbsp;|&nbsp; in Percentage = (Weighted Avg / Maximum count) × 100
+                  Formula: Weighted Avg = (Grade1×5 + Grade2×4 + Grade3×3 + Grade4×2 + Grade5×1) / Total &nbsp;|&nbsp; in Percentage = (Weighted Avg / Maximum count) × 100
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -143,11 +143,11 @@ export default function IndirectAttainmentPage() {
                   <thead className="bg-slate-900 text-white font-semibold">
                     <tr>
                       <th className="p-3">CO</th>
-                      <th className="p-3 text-center text-emerald-300">No. of grade 1</th>
-                      <th className="p-3 text-center text-blue-300">No. of grade 2</th>
-                      <th className="p-3 text-center text-amber-300">No. of grade 3</th>
-                      <th className="p-3 text-center text-orange-300">No. of grade 4</th>
-                      <th className="p-3 text-center text-rose-300">No. of grade 5</th>
+                      <th className="p-3 text-center text-emerald-300">No. of grade 1 (VS)</th>
+                      <th className="p-3 text-center text-blue-300">No. of grade 2 (S)</th>
+                      <th className="p-3 text-center text-amber-300">No. of grade 3 (U)</th>
+                      <th className="p-3 text-center text-orange-300">No. of grade 4 (D)</th>
+                      <th className="p-3 text-center text-rose-300">No. of grade 5 (VD)</th>
                       <th className="p-3 text-center">Total</th>
                       <th className="p-3 text-center">Weighted Avg.</th>
                       <th className="p-3 text-center">Maximum count</th>

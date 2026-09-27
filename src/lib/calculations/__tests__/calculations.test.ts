@@ -52,24 +52,24 @@ export function runCalculationUnitTests() {
   const norm2 = normalizeSurveyResponse('very satisfied ');
   results.push({
     test: 'Survey Response Normalization (Case-insensitive)',
-    passed: norm1.score === 1 && norm2.score === 1,
+    passed: norm1.score === 5 && norm2.score === 5,
   });
 
   const breakdown = { verySatisfied: 10, satisfied: 20, unsure: 10, dissatisfied: 5, veryDissatisfied: 5 };
-  // Total = 50. Sum = 10*1 + 20*2 + 10*3 + 5*4 + 5*5 = 10 + 40 + 30 + 20 + 25 = 125.
-  // Weighted Avg = 125 / 50 = 2.5
+  // Total = 50. Sum = 10*5 + 20*4 + 10*3 + 5*2 + 5*1 = 50 + 80 + 30 + 10 + 5 = 175.
+  // Weighted Avg = 175 / 50 = 3.5
   const weightedAvg = calculateSurveyWeightedAverage(breakdown);
   results.push({
-    test: 'Survey Weighted Average (125/50 = 2.5)',
-    passed: weightedAvg === 2.5,
-    details: `Expected 2.5, got ${weightedAvg}`,
+    test: 'Survey Weighted Average (175/50 = 3.5)',
+    passed: weightedAvg === 3.5,
+    details: `Expected 3.5, got ${weightedAvg}`,
   });
 
-  const indirectPct = calculateIndirectPercentage(2.5, 5); // 2.5 / 5 * 100 = 50%
+  const indirectPct = calculateIndirectPercentage(3.5, 5); // 3.5 / 5 * 100 = 70%
   results.push({
-    test: 'Indirect Percentage (2.5/5 * 100 = 50%)',
-    passed: indirectPct === 50,
-    details: `Expected 50, got ${indirectPct}`,
+    test: 'Indirect Percentage (3.5/5 * 100 = 70%)',
+    passed: indirectPct === 70,
+    details: `Expected 70, got ${indirectPct}`,
   });
 
   const weightedIndirect = calculateWeightedIndirect(indirectPct, 0.2); // 50 * 0.2 = 10%

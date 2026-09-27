@@ -226,11 +226,11 @@ export default function CourseExitSurveyPage() {
             <p className="text-xs font-bold text-purple-900 mb-2">Survey Response Scale Mapping:</p>
             <div className="flex flex-wrap gap-3 text-xs font-semibold">
               {[
-                { label: 'Very Satisfied', score: 1, color: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
-                { label: 'Satisfied', score: 2, color: 'text-blue-700 bg-blue-100 border-blue-200' },
+                { label: 'Very Satisfied', score: 5, color: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
+                { label: 'Satisfied', score: 4, color: 'text-blue-700 bg-blue-100 border-blue-200' },
                 { label: 'Unsure', score: 3, color: 'text-amber-700 bg-amber-100 border-amber-200' },
-                { label: 'Dissatisfied', score: 4, color: 'text-orange-700 bg-orange-100 border-orange-200' },
-                { label: 'Very Dissatisfied', score: 5, color: 'text-rose-700 bg-rose-100 border-rose-200' },
+                { label: 'Dissatisfied', score: 2, color: 'text-orange-700 bg-orange-100 border-orange-200' },
+                { label: 'Very Dissatisfied', score: 1, color: 'text-rose-700 bg-rose-100 border-rose-200' },
               ].map((item) => (
                 <span key={item.label} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${item.color}`}>
                   {item.label} = {item.score}
@@ -274,11 +274,11 @@ export default function CourseExitSurveyPage() {
                   <thead className="bg-slate-900 text-white font-semibold">
                     <tr>
                       <th className="p-3">CO</th>
-                      <th className="p-3 text-center text-emerald-300">No. of grade 1</th>
-                      <th className="p-3 text-center text-blue-300">No. of grade 2</th>
-                      <th className="p-3 text-center text-amber-300">No. of grade 3</th>
-                      <th className="p-3 text-center text-orange-300">No. of grade 4</th>
-                      <th className="p-3 text-center text-rose-300">No. of grade 5</th>
+                      <th className="p-3 text-center text-emerald-300">No. of grade 1 (VS)</th>
+                      <th className="p-3 text-center text-blue-300">No. of grade 2 (S)</th>
+                      <th className="p-3 text-center text-amber-300">No. of grade 3 (U)</th>
+                      <th className="p-3 text-center text-orange-300">No. of grade 4 (D)</th>
+                      <th className="p-3 text-center text-rose-300">No. of grade 5 (VD)</th>
                       <th className="p-3 text-center">Total</th>
                     </tr>
                   </thead>

@@ -12,7 +12,7 @@ import { OBEStore, AcademicYear, Programme, Semester, Subject, CourseOutcome, As
 import { ExcelImportPreview } from '@/lib/excel/parser';
 import { calculateCIACOAttainment } from '@/lib/calculations/cia';
 import { calculateDirectAttainment } from '@/lib/calculations/direct';
-import { calculateIndirectPercentage } from '@/lib/calculations/survey';
+import { calculateIndirectPercentage, calculateSurveyWeightedAverage } from '@/lib/calculations/survey';
 import { calculateFinalAttainment } from '@/lib/calculations/final';
 import { evaluateAttainmentLevel, evaluateCOTargetAchievement } from '@/lib/calculations/attainment-level';
 import { generateCOInterpretation } from '@/lib/calculations/interpretation';
@@ -335,8 +335,9 @@ function SubjectDetailContent() {
     const grade4 = sRes.filter((r) => r.score === 4).length;
     const grade5 = sRes.filter((r) => r.score === 5).length;
     const surveyTotal = sRes.length;
-    const sScores = sRes.map((r) => r.score).filter((sc) => sc > 0);
-    const avgSurveyScore = sScores.length > 0 ? Number((sScores.reduce((a, b) => a + b, 0) / sScores.length).toFixed(2)) : 0;
+    // Use weighted formula: Grade1×5 + Grade2×4 + Grade3×3 + Grade4×2 + Grade5×1
+    const surveyBreakdown = { verySatisfied: grade1, satisfied: grade2, unsure: grade3, dissatisfied: grade4, veryDissatisfied: grade5 };
+    const avgSurveyScore = calculateSurveyWeightedAverage(surveyBreakdown);
     const maxCount = config.surveyMaxScore ?? 5;
     const indirectPct = calculateIndirectPercentage(avgSurveyScore, maxCount);
     const indirectLevel = evaluateAttainmentLevel(indirectPct, {
@@ -1177,11 +1178,11 @@ function SubjectDetailContent() {
                 <p className="text-xs font-bold text-purple-900 mb-2">Survey Response Scale Mapping:</p>
                 <div className="flex flex-wrap gap-3 text-xs font-semibold">
                   {[
-                    { label: 'Very Satisfied', score: 1, color: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
-                    { label: 'Satisfied', score: 2, color: 'text-blue-700 bg-blue-100 border-blue-200' },
+                    { label: 'Very Satisfied', score: 5, color: 'text-emerald-700 bg-emerald-100 border-emerald-200' },
+                    { label: 'Satisfied', score: 4, color: 'text-blue-700 bg-blue-100 border-blue-200' },
                     { label: 'Unsure', score: 3, color: 'text-amber-700 bg-amber-100 border-amber-200' },
-                    { label: 'Dissatisfied', score: 4, color: 'text-orange-700 bg-orange-100 border-orange-200' },
-                    { label: 'Very Dissatisfied', score: 5, color: 'text-rose-700 bg-rose-100 border-rose-200' },
+                    { label: 'Dissatisfied', score: 2, color: 'text-orange-700 bg-orange-100 border-orange-200' },
+                    { label: 'Very Dissatisfied', score: 1, color: 'text-rose-700 bg-rose-100 border-rose-200' },
                   ].map((item) => (
                     <span key={item.label} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${item.color}`}>
                       {item.label} = {item.score}
@@ -1207,11 +1208,11 @@ function SubjectDetailContent() {
                     <thead className="bg-slate-900 text-white font-semibold">
                       <tr>
                         <th className="p-3">CO</th>
-                        <th className="p-3 text-center text-emerald-300">No. of grade 1</th>
-                        <th className="p-3 text-center text-blue-300">No. of grade 2</th>
-                        <th className="p-3 text-center text-amber-300">No. of grade 3</th>
-                        <th className="p-3 text-center text-orange-300">No. of grade 4</th>
-                        <th className="p-3 text-center text-rose-300">No. of grade 5</th>
+                        <th className="p-3 text-center text-emerald-300">No. of grade 1 (VS)</th>
+                        <th className="p-3 text-center text-blue-300">No. of grade 2 (S)</th>
+                        <th className="p-3 text-center text-amber-300">No. of grade 3 (U)</th>
+                        <th className="p-3 text-center text-orange-300">No. of grade 4 (D)</th>
+                        <th className="p-3 text-center text-rose-300">No. of grade 5 (VD)</th>
                         <th className="p-3 text-center">Total</th>
                       </tr>
                     </thead>
@@ -1261,7 +1262,7 @@ function SubjectDetailContent() {
 
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-xs font-semibold text-purple-900">
                 <span className="font-bold">Formula: </span>
-                Weighted Avg = (Grade1×1 + Grade2×2 + Grade3×3 + Grade4×4 + Grade5×5) / Total &nbsp;|&nbsp;
+                Weighted Avg = (Grade1×5 + Grade2×4 + Grade3×3 + Grade4×2 + Grade5×1) / Total &nbsp;|&nbsp;
                 <span className="font-bold"> in Percentage = (Weighted Avg / Maximum count) × 100</span>
               </div>
 
@@ -1270,11 +1271,11 @@ function SubjectDetailContent() {
                   <thead className="bg-slate-900 text-white font-semibold">
                     <tr>
                       <th className="p-3">CO</th>
-                      <th className="p-3 text-center text-emerald-300">No. of grade 1</th>
-                      <th className="p-3 text-center text-blue-300">No. of grade 2</th>
-                      <th className="p-3 text-center text-amber-300">No. of grade 3</th>
-                      <th className="p-3 text-center text-orange-300">No. of grade 4</th>
-                      <th className="p-3 text-center text-rose-300">No. of grade 5</th>
+                      <th className="p-3 text-center text-emerald-300">No. of grade 1 (VS)</th>
+                      <th className="p-3 text-center text-blue-300">No. of grade 2 (S)</th>
+                      <th className="p-3 text-center text-amber-300">No. of grade 3 (U)</th>
+                      <th className="p-3 text-center text-orange-300">No. of grade 4 (D)</th>
+                      <th className="p-3 text-center text-rose-300">No. of grade 5 (VD)</th>
                       <th className="p-3 text-center">Total</th>
                       <th className="p-3 text-center">Weighted Avg.</th>
                       <th className="p-3 text-center">Maximum count</th>
